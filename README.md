@@ -1,178 +1,129 @@
-# Avida Video / Image Annotation Tool
+# Avida Annotation Tool
 
-A React + TypeScript web tool that lets users load an image or video and place interactive icons, shapes, and lines on top of it. Annotations can be selected, dragged, grouped, recolored, resized, undone/redone, and exported as JSON. Annotations persist across page reloads via `localStorage`.
+React + TypeScript app for the Avida interview project. Lets you load an image or video and place icons/shapes on top of it. You can drag them around, group them, change colors, resize, undo/redo, and export to JSON.
 
-Built for the Avida Full Stack Engineer interview project.
+Repo: https://github.com/jash65571/avida-annotation-tool
 
-**Live demo (run locally):** see *How to run locally* below.
-**Repository:** https://github.com/jash65571/avida-annotation-tool
+## Running it
 
----
+You need Node 18 or newer.
 
-## Features
-
-### Core requirements
-- Upload images and videos (file input)
-- Basic video play/pause control
-- Place Font Awesome icons (camera, car, person, tree)
-- Place shapes (rectangle, circle, line with arrowhead)
-- Click to place, drag to reposition
-- Single-click select, shift-click for multi-select
-- Group / ungroup selected annotations — grouped items move and recolor together
-- Color states: green / red / gray (active / alert / muted)
-- Color applies to icons, shape borders, shape fills, and lines
-
-### Nice-to-haves implemented
-- **Undo / redo** — full history of every action (create, delete, color, group, drag, resize), capped at 50 entries
-- **Resize** — slider (50%–200%) scales selected annotations
-- **Persistence** — annotations survive page reload via `localStorage`
-- **Delete** selected annotations
-- **Export** annotations as JSON
-- **Responsive layout** — adapts at 1200 / 960 / 760 / 480 px breakpoints
-
-### Not implemented (time-permitting items)
-- Drag-select / lasso multi-select (shift-click works, but no rubber-band)
-- Keyboard shortcuts for undo/redo (the buttons say "Ctrl+Z / Ctrl+Y" in tooltips, but the handlers aren't wired)
-- Annotation rotation
-- Saving the uploaded media itself (only the annotation data persists; user must re-upload media after refresh)
-
----
-
-## How to run locally
-
-**Prerequisites:** Node.js 18+ and npm.
-
-```bash
+```
 npm install
 npm run dev
 ```
 
-Then open the URL printed in the terminal (default: `http://localhost:5173`).
+That'll start a Vite dev server, usually on http://localhost:5173.
 
-To build for production:
-
-```bash
+For a production build:
+```
 npm run build
 npm run preview
 ```
 
----
+## What works
 
-## Libraries used and why
+Core stuff from the spec:
+- Upload images or videos
+- Play/pause for video
+- Place icons (camera, car, person, tree) and shapes (rectangle, circle, line with arrowhead)
+- Click to place, drag to move
+- Click to select, shift-click for multi-select
+- Group / ungroup so items move together
+- Color states: green, red, gray (applies to icons, borders, fills, lines)
+- Delete selected
+- Export to JSON
 
-The project intentionally has a tiny dependency footprint — only React itself is a runtime dependency.
+Nice-to-haves I had time for:
+- Undo / redo (capped at 50 steps so memory doesn't blow up)
+- Resize slider, 50% to 200%
+- localStorage persistence so annotations survive a refresh
+- Responsive CSS, breakpoints at 1200 / 960 / 760 / 480
 
-| Library | Purpose | Why this one |
-|---|---|---|
-| **React 19** | UI framework | Avida uses React internally per the brief, so it's the most readable stack for the reviewer. Hooks (`useState`, `useEffect`, `useRef`) cover everything this app needs without extra state libraries. |
-| **TypeScript** | Static typing | Catches mistakes early (e.g. invalid annotation `type` strings) and makes the data shape (the `Annotation` type) self-documenting. |
-| **Vite** | Dev server + bundler | Near-instant cold start, fast HMR, no config required. |
-| **Font Awesome 6** (CDN) | Icon set | Specified in the brief. Loaded via `<link>` in `index.html` so there's no npm install / icon-library trade-off to manage. |
+What I didn't get to:
+- Drag-select / lasso. Shift-click works for now.
+- Keyboard shortcuts for undo/redo. The buttons have Ctrl+Z / Ctrl+Y in the tooltip but I never wired up the actual keydown handler.
+- Rotation
+- Persisting the actual media. Only the annotation data is saved, the user has to re-upload the image/video on refresh. Storing video bytes in localStorage isn't really viable.
 
-Deliberately **not** used:
-- No CSS framework (Tailwind, MUI, etc.) — the UI is small enough that hand-written CSS in `App.css` is clearer.
-- No state library (Redux, Zustand) — `useState` is sufficient; adding a store would be premature.
-- No drag-and-drop library — pointer events handle drag in ~30 lines.
+## Why these libraries
 
----
+Pretty minimal dependency list on purpose.
 
-## Project structure
+- **React 19** because the brief said Avida uses React + TS internally, so it's the easiest stack for whoever's reviewing this.
+- **TypeScript** for the obvious reasons. Also makes the `Annotation` type self-documenting which helps when there are 7 different annotation types floating around.
+- **Vite** because it's fast and zero config.
+- **Font Awesome 6** loaded via CDN in `index.html`, like the spec recommended.
+
+I deliberately didn't use:
+- a CSS framework — there's only really one screen, hand-written CSS in App.css is fine
+- a state library — useState is enough, Redux would be overkill
+- a drag-and-drop lib — pointer events do the job in maybe 30 lines
+
+## Project layout
 
 ```
 src/
-├── App.tsx                    # State, event handlers, history, persistence
-├── App.css                    # Styles + responsive breakpoints
-├── types.ts                   # Annotation, AnnotationType, AnnotationColor, colorMap
-├── main.tsx                   # React entry point
-└── components/
-    ├── Toolbar.tsx            # Tools, color buttons, size slider, undo/redo, actions
-    ├── Workspace.tsx          # Media display + annotation rendering layer
-    ├── AnnotationItem.tsx     # Renders one icon / rectangle / circle / line
-    ├── StatusRow.tsx          # Active tool + counts
-    └── ExportPanel.tsx        # JSON output textarea
+  App.tsx                  state, event handlers, history, persistence
+  App.css                  styles + responsive breakpoints
+  types.ts                 Annotation type, color map
+  main.tsx                 entry point
+  components/
+    Toolbar.tsx            tools, colors, size slider, undo/redo, actions
+    Workspace.tsx          media + annotation layer
+    AnnotationItem.tsx     one icon / shape / line
+    StatusRow.tsx          tool + counts
+    ExportPanel.tsx        the JSON output box
 ```
 
-State lives in `App.tsx` and flows down via props. The `Annotation` shape is the single source of truth — every feature (color, group, drag, resize, undo) is just a transformation of the `annotations` array.
+State lives in App.tsx and gets passed down. The `Annotation` type is the single source of truth, and most features are just a `.map()` over the annotations array with some transform applied.
 
----
+## Stuff I ran into
 
-## Challenges
+A few things I had to actually think about:
 
-1. **Stale closures in the history reducer.** My first version of `commitAnnotations` read `history` and `historyIndex` from the function's closure, which meant rapid successive calls could overwrite each other's history entries. Fixed by switching to the functional updater form: `setHistory(currentHistory => …)`.
+The history reducer had a stale closure bug. First version of `commitAnnotations` read `history` and `historyIndex` directly from the closure, so if two updates fired close together the second one could lose the first one's entry. Switched to `setHistory(currentHistory => ...)` which fixes it because React then reads the latest state.
 
-2. **Keeping grouped items in sync.** Selecting one item in a group needed to "expand" the selection to all members of that group, otherwise color/delete/drag would only affect the clicked item. The `getExpandedSelectionIds` helper walks the array twice — once to find the group ids of currently selected items, then again to gather every member of those groups.
+Selecting one item in a group needed to "expand" the selection to all members of that group, otherwise color/delete/drag would only affect the clicked one. The `getExpandedSelectionIds` helper does two passes: first finds the groupIds of selected items, then collects every item in those groups.
 
-3. **Drag + history.** Updating history on every `pointermove` would create dozens of useless undo entries per drag. Instead, drag mutations only update `annotations` state during the move, and a single history entry is committed in `pointerup`.
+Drag with history was tricky. If I committed to history on every pointermove, I'd get like 40 undo entries per drag which is useless. So drag mutations only update annotations state during the move, and one history entry gets committed in pointerup.
 
-4. **Refactor pass.** After the initial implementation, four mutation handlers (`changeSelectedColor`, `changeAnnotationSize`, `groupSelected`, `ungroupSelected`) had near-identical bodies. I extracted `updateSelectedAnnotations(transform)` to take any per-annotation transform, which collapsed ~60 lines into ~10.
+After getting it all working I noticed `changeSelectedColor`, `changeAnnotationSize`, `groupSelected`, `ungroupSelected` were all basically the same function with one different line. Pulled them into a single `updateSelectedAnnotations(transform)` helper, which knocked off about 60 lines.
 
----
+## Trade-offs
 
-## Trade-offs and intentional limitations
+History stores full snapshots, not diffs. Way simpler and at this scale it doesn't matter. Capped at 50 to keep memory bounded.
 
-- **History stores full snapshots, not diffs.** Simpler to reason about and fast at this scale; would be wasteful if annotations grew to thousands. Capped at 50 entries to keep memory bounded.
-- **Only annotations persist, not the media.** Storing video/image bytes in `localStorage` would blow past the 5–10 MB quota. The media URL is created with `URL.createObjectURL` and revoked on cleanup; the user must re-upload after a refresh.
-- **Shape sizes use a CSS `scale()` transform.** This scales the visual but not the underlying width/height — it's smooth and one-line, but means hit-testing and bounding-box math (if added later) would need to multiply by `size`. Acceptable for this scope.
-- **No tests.** Given the time budget and the visual nature of the app, I prioritized a working interactive demo over unit tests. The data transformations (`map`/`filter` over `annotations`) are pure and would be straightforward to test.
-- **Click-to-place, not drag-to-draw.** The brief allowed either; click-to-place is faster to use and avoids ambiguous gesture detection. Shapes have fixed default dimensions, then resize via the slider.
+Resize uses a CSS `scale()` transform rather than actually changing width/height. Smoother and one-line, but if I added bounding-box stuff later (like a select rectangle around scaled items), I'd need to multiply by the size. Fine for now.
 
----
+No tests. Time budget. The data transforms are all pure `.map`/`.filter` over the annotations array and would be easy to unit test if this were going further than an interview project.
 
-## AI assistance
+Click-to-place, not drag-to-draw. The spec allowed either. Click is faster and avoids ambiguous gesture detection. Shapes get a fixed default size, then you can resize.
 
-I used Claude (Anthropic) heavily during this build. Being transparent about it:
+## AI use
 
-**What AI generated:**
-- Initial scaffolding of `App.tsx`, the components, and `types.ts` — Claude produced the first working version of the core features (upload, click-to-place, drag, group, recolor, export) from the spec.
-- Most of the CSS, including the responsive breakpoints in `App.css`.
-- The four nice-to-haves (undo/redo, resize, persistence, responsive design) were added in a second pass.
-- A code-quality refactor pass that introduced `STORAGE_KEY` / `MAX_HISTORY` constants, the `updateSelectedAnnotations` helper, and fixed a stale-closure bug in the history reducer.
+I used Claude (Anthropic) a lot for this. Being upfront about it since the brief asked.
 
-**How I validated and modified it:**
-- Read every file and confirmed the data flow (props down, callbacks up — no hidden state).
-- Verified the build passes (`npm run build`) after every significant change.
-- Manually exercised every feature in the browser: upload → place → drag → group → recolor → resize → undo → redo → export → refresh-and-verify-persistence → resize-window-to-test-responsive.
-- Caught and removed a chunk of unnecessary scratch documentation files Claude generated during the session that didn't belong in the repo.
-- Pushed back when a change introduced duplication or magic strings, and had it refactored before committing.
+Claude wrote a lot of the initial code — first working version of App.tsx and the components, the types, the CSS including the responsive breakpoints. It also helped add the four nice-to-haves and did a refactor pass that pulled out the constants and the `updateSelectedAnnotations` helper, and caught the stale-closure bug in the history code.
 
-**What I did not just accept:**
-- I rejected an early suggestion to store everything (including media URLs and UI state) in `localStorage` — only annotation data needs to persist.
-- I removed the keyboard-shortcut tooltip text initially, then added it back as a TODO marker since the handlers aren't wired (noted under "Not implemented" above).
+What I did:
+- Read every file and walked through the data flow myself before submitting. Couldn't explain the code in an interview otherwise, which would defeat the point.
+- Tested every feature manually in the browser. Upload, place, drag, group, recolor, resize, undo, redo, export, then refreshed to make sure persistence works, then resized the window to check responsive.
+- Pushed back when stuff was getting bloated. Claude kept generating extra documentation files which I deleted, and I made it refactor when there was duplication.
+- Confirmed the build passes (`npm run build`) before pushing.
 
-I treated Claude as a fast pair-programmer, not as a substitute for understanding the code. Every commit was reviewed before pushing.
+I treated it like a fast pair programmer. I wouldn't ship anything I didn't understand.
 
----
+## Time
 
-## Estimated total time spent
+Probably 6-8 hours total. Most of that was on the core features and the refactor pass after the nice-to-haves were in. Manual testing and the README took maybe 1.5 hours combined.
 
-Roughly **6–8 hours**, broken down approximately as:
+## Presentation
 
-- 2 hrs — initial scaffolding, core features (upload, place, drag, group, recolor, export)
-- 1 hr — CSS / layout / responsive breakpoints
-- 1.5 hrs — nice-to-haves (undo/redo, resize, persistence)
-- 1 hr — refactor / cleanup pass (extracting helpers, removing duplication, fixing stale closure)
-- 0.5–1 hr — manual testing and verifying every feature in browser
-- 1 hr — README and presentation prep
+If I'm walking through this:
 
----
+The architecture is basically: all state in App.tsx, props down, callbacks up. The `Annotation` shape (`id, type, x, y, color, groupId, size`) is the source of truth. Every feature is some operation on the annotations array — create is append, delete is filter, color/resize/group are map-with-a-transform, drag is map-with-position-delta, undo/redo is restoring a snapshot from history.
 
-## Presentation notes
+Everything that mutates annotations goes through one function (`commitAnnotations`), which handles state, persistence, and history in one place. That's why adding a new mutation (like resize) was basically a one-liner.
 
-**Why this stack?** The brief said Avida uses React + TypeScript heavily, so picking that minimizes friction for the reviewer. Vite is the modern default for spinning up a React+TS app. No state library because hooks are enough; no UI library because there are ~15 controls total.
-
-**How the architecture works:** All state lives in `App.tsx`. The `Annotation` type in `types.ts` is the single source of truth — each annotation has `id, type, x, y, color, groupId, size`. Every feature is just a transformation of the `annotations` array:
-- **Create** = append
-- **Delete** = filter
-- **Recolor / resize / group / ungroup** = map with a transform
-- **Drag** = map with a position delta (in `pointermove`), commit one history entry on `pointerup`
-- **Undo / redo** = restore a prior snapshot from the `history` array
-
-Centralizing this through `commitAnnotations()` means persistence (`localStorage`), history tracking, and clearing the export buffer all happen in one place — every mutation goes through it.
-
-**Biggest hurdle:** the stale-closure bug in `commitAnnotations` (described under Challenges). It only showed up under fast successive actions, which is exactly the kind of bug that would slip past casual manual testing — caught by reasoning about what `setHistory(value)` vs `setHistory(fn)` actually does in React's batching model.
-
----
-
-## License
-
-Built for interview purposes. No license attached.
+The main hurdle was the stale-closure bug I mentioned earlier. It only showed up under rapid successive actions which is exactly the kind of thing that slips past casual testing. Caught it by thinking about what `setHistory(value)` vs `setHistory(fn)` actually do under React's batching model.
