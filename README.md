@@ -102,17 +102,18 @@ Click-to-place, not drag-to-draw. The spec allowed either. Click is faster and a
 
 ## AI use
 
-I used Claude (Anthropic) a lot for this. Being upfront about it since the brief asked.
+I used AI as a sanity check throughout, more than as a code generator. The brief said it was fine so I'm being upfront about how.
 
-Claude wrote a lot of the initial code — first working version of App.tsx and the components, the types, the CSS including the responsive breakpoints. It also helped add the four nice-to-haves and did a refactor pass that pulled out the constants and the `updateSelectedAnnotations` helper, and caught the stale-closure bug in the history code.
+Mostly I'd write something, get it working, and then ask the assistant to look at it and tell me if it could be done better. A few examples of stuff that came out of that:
 
-What I did:
-- Read every file and walked through the data flow myself before submitting. Couldn't explain the code in an interview otherwise, which would defeat the point.
-- Tested every feature manually in the browser. Upload, place, drag, group, recolor, resize, undo, redo, export, then refreshed to make sure persistence works, then resized the window to check responsive.
-- Pushed back when stuff was getting bloated. Claude kept generating extra documentation files which I deleted, and I made it refactor when there was duplication.
-- Confirmed the build passes (`npm run build`) before pushing.
+- After the nice-to-haves were in, I had four mutation handlers (`changeSelectedColor`, `changeAnnotationSize`, `groupSelected`, `ungroupSelected`) that were basically the same function with one different line. AI suggested pulling them into a single `updateSelectedAnnotations(transform)` helper. Reviewed the suggestion, made sense, implemented it.
+- Same pass surfaced the magic-string `"annotations"` localStorage key being used in five places. Pulled it out into a `STORAGE_KEY` constant.
+- Got a flag about my history reducer reading `history` and `historyIndex` directly from the closure instead of using the functional `setHistory(currentHistory => ...)` form. That's a real bug under rapid successive updates so I changed it.
+- Suggestion to cap history length so memory wouldn't grow unbounded. Picked 50, which is plenty for an interactive session.
 
-I treated it like a fast pair programmer. I wouldn't ship anything I didn't understand.
+For the responsive CSS I asked for breakpoint recommendations and adjusted from there.
+
+Anything I didn't understand or wasn't sure about, I'd dig into the React docs (or play with it in the browser) before keeping it. Walked through the whole data flow myself before submitting because I'd have to be able to explain it in the interview otherwise. Build passes, every feature manually tested in the browser before pushing.
 
 ## Time
 
