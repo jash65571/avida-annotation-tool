@@ -12,6 +12,9 @@ import type {
   MediaKind,
 } from "./types";
 
+const STORAGE_KEY = "annotations";
+const MAX_HISTORY = 50;
+
 function createId() {
   if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
     return crypto.randomUUID();
@@ -20,58 +23,77 @@ function createId() {
   return `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 }
 
+function loadStoredAnnotations(): Annotation[] {
+  const saved = localStorage.getItem(STORAGE_KEY);
+  return saved ? JSON.parse(saved) : [];
+}
+
+function persistAnnotations(annotations: Annotation[]) {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(annotations));
+}
+
 function App() {
   const videoRef = useRef<HTMLVideoElement | null>(null);
 
   const [mediaUrl, setMediaUrl] = useState<string | null>(null);
   const [mediaKind, setMediaKind] = useState<MediaKind>(null);
   const [activeTool, setActiveTool] = useState<AnnotationType>("camera");
-  const [annotations, setAnnotations] = useState<Annotation[]>(() => {
-    const saved = localStorage.getItem("annotations");
-    return saved ? JSON.parse(saved) : [];
-  });
+  const [annotations, setAnnotations] = useState<Annotation[]>(loadStoredAnnotations);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [dragState, setDragState] = useState<DragState>(null);
   const [exportedJson, setExportedJson] = useState("");
   const [isVideoPlaying, setIsVideoPlaying] = useState(false);
   const [annotationSize, setAnnotationSize] = useState(1);
-  const [history, setHistory] = useState<Annotation[][]>(() => {
-    const saved = localStorage.getItem("annotations");
-    const initial = saved ? JSON.parse(saved) : [];
-    return [initial];
-  });
+  const [history, setHistory] = useState<Annotation[][]>(() => [
+    loadStoredAnnotations(),
+  ]);
   const [historyIndex, setHistoryIndex] = useState(0);
 
-  function updateAnnotationsWithHistory(newAnnotations: Annotation[]) {
+  function commitAnnotations(newAnnotations: Annotation[]) {
     setAnnotations(newAnnotations);
-    localStorage.setItem("annotations", JSON.stringify(newAnnotations));
+    persistAnnotations(newAnnotations);
     setExportedJson("");
-    const newHistory = history.slice(0, historyIndex + 1);
-    newHistory.push(newAnnotations);
-    setHistory(newHistory);
-    setHistoryIndex(newHistory.length - 1);
+    setHistory((currentHistory) => {
+      const truncated = currentHistory.slice(0, historyIndex + 1);
+      truncated.push(newAnnotations);
+      const trimmed =
+        truncated.length > MAX_HISTORY
+          ? truncated.slice(truncated.length - MAX_HISTORY)
+          : truncated;
+      setHistoryIndex(trimmed.length - 1);
+      return trimmed;
+    });
+  }
+
+  function jumpToHistory(targetIndex: number) {
+    setHistoryIndex(targetIndex);
+    const target = history[targetIndex];
+    setAnnotations(target);
+    persistAnnotations(target);
+    setExportedJson("");
   }
 
   function undo() {
     if (historyIndex > 0) {
-      const newIndex = historyIndex - 1;
-      setHistoryIndex(newIndex);
-      const prevState = history[newIndex];
-      setAnnotations(prevState);
-      localStorage.setItem("annotations", JSON.stringify(prevState));
-      setExportedJson("");
+      jumpToHistory(historyIndex - 1);
     }
   }
 
   function redo() {
     if (historyIndex < history.length - 1) {
-      const newIndex = historyIndex + 1;
-      setHistoryIndex(newIndex);
-      const nextState = history[newIndex];
-      setAnnotations(nextState);
-      localStorage.setItem("annotations", JSON.stringify(nextState));
-      setExportedJson("");
+      jumpToHistory(historyIndex + 1);
     }
+  }
+
+  function updateSelectedAnnotations(
+    transform: (annotation: Annotation) => Annotation
+  ) {
+    const idsToChange = getExpandedSelectionIds();
+    const updated = annotations.map((item) =>
+      idsToChange.includes(item.id) ? transform(item) : item
+    );
+    commitAnnotations(updated);
+    setSelectedIds(idsToChange);
   }
 
   useEffect(() => {
@@ -130,7 +152,7 @@ function App() {
     setSelectedIds([]);
     setExportedJson("");
     setIsVideoPlaying(false);
-    localStorage.setItem("annotations", JSON.stringify(emptyAnnotations));
+    persistAnnotations(emptyAnnotations);
 
     event.target.value = "";
   }
@@ -156,7 +178,7 @@ function App() {
       size: annotationSize,
     };
 
-    updateAnnotationsWithHistory([...annotations, newAnnotation]);
+    commitAnnotations([...annotations, newAnnotation]);
     setSelectedIds([newAnnotation.id]);
   }
 
@@ -262,98 +284,38 @@ function App() {
 
   function handlePointerUp() {
     if (dragState) {
-      updateAnnotationsWithHistory(annotations);
+      commitAnnotations(annotations);
     }
     setDragState(null);
   }
 
   function changeSelectedColor(color: AnnotationColor) {
-    const idsToChange = getExpandedSelectionIds();
-
-    const updated = annotations.map((item) => {
-      if (!idsToChange.includes(item.id)) {
-        return item;
-      }
-
-      return {
-        ...item,
-        color,
-      };
-    });
-
-    updateAnnotationsWithHistory(updated);
-    setSelectedIds(idsToChange);
+    updateSelectedAnnotations((item) => ({ ...item, color }));
   }
 
   function changeAnnotationSize(size: number) {
-    const idsToChange = getExpandedSelectionIds();
-
-    const updated = annotations.map((item) => {
-      if (!idsToChange.includes(item.id)) {
-        return item;
-      }
-
-      return {
-        ...item,
-        size,
-      };
-    });
-
-    updateAnnotationsWithHistory(updated);
-    setSelectedIds(idsToChange);
+    updateSelectedAnnotations((item) => ({ ...item, size }));
     setAnnotationSize(size);
   }
 
   function groupSelected() {
-    const idsToGroup = getExpandedSelectionIds();
-
-    if (idsToGroup.length < 2) {
+    if (getExpandedSelectionIds().length < 2) {
       return;
     }
-
     const groupId = createId();
-
-    const updated = annotations.map((item) => {
-      if (!idsToGroup.includes(item.id)) {
-        return item;
-      }
-
-      return {
-        ...item,
-        groupId,
-      };
-    });
-
-    updateAnnotationsWithHistory(updated);
-    setSelectedIds(idsToGroup);
+    updateSelectedAnnotations((item) => ({ ...item, groupId }));
   }
 
   function ungroupSelected() {
-    const idsToUngroup = getExpandedSelectionIds();
-
-    const updated = annotations.map((item) => {
-      if (!idsToUngroup.includes(item.id)) {
-        return item;
-      }
-
-      return {
-        ...item,
-        groupId: null,
-      };
-    });
-
-    updateAnnotationsWithHistory(updated);
-    setSelectedIds(idsToUngroup);
+    updateSelectedAnnotations((item) => ({ ...item, groupId: null }));
   }
 
   function deleteSelected() {
     const idsToDelete = getExpandedSelectionIds();
-
     const updated = annotations.filter(
       (item) => !idsToDelete.includes(item.id)
     );
-
-    updateAnnotationsWithHistory(updated);
+    commitAnnotations(updated);
     setSelectedIds([]);
   }
 
